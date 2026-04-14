@@ -9,6 +9,7 @@
 
 create extension if not exists postgis;
 create extension if not exists pgcrypto;
+create extension if not exists pg_trgm;
 
 -- ---------------------------------------------------------------------
 -- TABLE: schools  (catalogo maestro, 23,447 centros SACE 2024)
@@ -38,9 +39,6 @@ create index if not exists schools_geom_idx     on public.schools using gist (ge
 create index if not exists schools_dept_idx     on public.schools (department);
 create index if not exists schools_municipio_idx on public.schools (municipio);
 create index if not exists schools_name_trgm    on public.schools using gin (name gin_trgm_ops);
-
--- trigram para busqueda por nombre en servidor (opcional; la PWA ya busca local)
-create extension if not exists pg_trgm;
 
 -- ---------------------------------------------------------------------
 -- TABLE: captures  (cada georreferenciacion individual; puede haber N por escuela)
