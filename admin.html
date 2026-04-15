@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GeoEscuelas Admin</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--pri:#003876;--ok:#28a745;--warn:#f0ad4e;--err:#dc3545;--bg:#f0f4f8;--card:#fff;--txt:#1a1a1a;--gray:#666;--mut:#999}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--txt)}
+button{cursor:pointer;font-family:inherit}
+
+/* Login */
+.login{position:fixed;inset:0;background:var(--pri);display:flex;align-items:center;justify-content:center;z-index:9999}
+.login-box{background:#fff;padding:40px;border-radius:12px;width:360px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.login-box h1{font-size:22px;color:var(--pri);margin-bottom:6px}
+.login-box .sub{font-size:13px;color:var(--gray);margin-bottom:24px}
+.login-box label{display:block;font-size:13px;font-weight:600;color:#444;margin-top:14px;margin-bottom:6px}
+.login-box input{width:100%;padding:12px;border:2px solid #d0d5dd;border-radius:8px;font-size:15px}
+.login-box input:focus{border-color:var(--pri);outline:none}
+.login-box button{width:100%;margin-top:20px;padding:14px;background:var(--pri);color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700}
+.login-box .err{color:var(--err);font-size:13px;margin-top:10px;min-height:18px}
+
+/* App layout */
+.app{display:none;height:100vh;flex-direction:column}
+.app.show{display:flex}
+.topbar{background:var(--pri);color:#fff;padding:10px 18px;display:flex;align-items:center;gap:18px;flex-shrink:0}
+.topbar h1{font-size:18px;font-weight:700;flex:1}
+.topbar .user{font-size:13px;opacity:.85}
+.topbar button{background:rgba(255,255,255,.15);color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600}
+.topbar button:hover{background:rgba(255,255,255,.25)}
+
+.stats{background:#fff;padding:10px 18px;display:flex;gap:20px;border-bottom:1px solid #e5e7eb;flex-shrink:0;flex-wrap:wrap;align-items:center}
+.stat{display:flex;flex-direction:column;line-height:1.1}
+.stat .v{font-size:20px;font-weight:800;color:var(--pri)}
+.stat .l{font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px}
+.stat.ok .v{color:var(--ok)}
+.stat.pe .v{color:var(--warn)}
+.stat.sus .v{color:var(--err)}
+.bar{flex:1;min-width:200px;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;margin-left:10px}
+.bar > div{height:100%;background:linear-gradient(90deg,var(--pri),var(--ok));transition:width .4s}
+.exp-buttons{display:flex;gap:8px}
+.exp-buttons button{padding:8px 14px;background:#e8f0fe;color:var(--pri);border:none;border-radius:6px;font-weight:600;font-size:13px}
+
+.body{flex:1;display:grid;grid-template-columns:280px 1fr 360px;overflow:hidden;min-height:0}
+
+/* Filters */
+.filters{background:#fff;border-right:1px solid #e5e7eb;overflow-y:auto;padding:16px}
+.filters h3{font-size:13px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;margin-top:14px}
+.filters h3:first-child{margin-top:0}
+.filters select,.filters input{width:100%;padding:8px 10px;border:1.5px solid #d0d5dd;border-radius:6px;font-size:14px;background:#fff}
+.filters .chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{padding:6px 10px;background:#f0f4f8;border:1px solid #d0d5dd;border-radius:14px;font-size:12px;cursor:pointer}
+.chip.active{background:var(--pri);color:#fff;border-color:var(--pri)}
+.filters button.reset{width:100%;margin-top:12px;padding:8px;background:#fff;border:1.5px solid #d0d5dd;color:var(--gray);border-radius:6px;font-weight:600;font-size:13px}
+
+/* Map */
+.map-wrap{position:relative;background:#dde}
+#map{width:100%;height:100%}
+.legend{position:absolute;bottom:14px;left:14px;background:#fff;padding:10px 12px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.15);font-size:12px;z-index:1000}
+.legend .row{display:flex;align-items:center;gap:8px;margin:3px 0}
+.legend .dot{width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.2)}
+.dot.ok{background:var(--ok)}
+.dot.sus{background:var(--err)}
+.dot.pe{background:var(--mut)}
+
+/* Detail panel */
+.detail{background:#fff;border-left:1px solid #e5e7eb;overflow-y:auto;padding:16px}
+.detail.empty{display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:14px;text-align:center;padding:40px 20px}
+.detail h2{font-size:17px;color:var(--pri);margin-bottom:4px;line-height:1.25}
+.detail .meta{font-size:12px;color:var(--gray);margin-bottom:14px;line-height:1.5}
+.detail .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-right:4px}
+.b-ok{background:#d4edda;color:#155724}
+.b-pe{background:#fff3cd;color:#856404}
+.b-sus{background:#f8d7da;color:#721c24}
+.cap{background:#f8f9fb;border-radius:8px;padding:12px;margin-bottom:10px;border-left:3px solid #d0d5dd}
+.cap.primary{border-left-color:var(--ok)}
+.cap.suspect{border-left-color:var(--err)}
+.cap .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.cap .who{font-weight:700;font-size:13px}
+.cap .when{font-size:11px;color:var(--gray)}
+.cap .coords{font-family:ui-monospace,monospace;font-size:12px;color:#444}
+.cap .obs{font-size:12px;color:#555;margin-top:6px;font-style:italic}
+.cap .actions{display:flex;gap:6px;margin-top:8px}
+.cap .actions button{padding:6px 10px;border:1px solid #d0d5dd;background:#fff;border-radius:5px;font-size:12px;font-weight:600}
+.cap .actions .promote{border-color:var(--ok);color:var(--ok)}
+.cap .actions .delete{border-color:var(--err);color:var(--err)}
+.cap .actions button:hover{filter:brightness(.95)}
+.detail .reset-btn{width:100%;margin-top:12px;padding:10px;background:#fff;border:1.5px solid var(--warn);color:#856404;border-radius:6px;font-weight:600;font-size:13px}
+.detail .open-osm{display:inline-block;color:var(--pri);font-size:12px;text-decoration:underline;margin-top:4px}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:12px 22px;border-radius:8px;font-size:14px;font-weight:600;z-index:10001;opacity:0;transition:.3s;pointer-events:none;max-width:90%;text-align:center}
+.toast.show{opacity:1}
+
+@media (max-width: 1100px) {
+  .body{grid-template-columns:1fr}
+  .filters,.detail{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login" id="login">
+  <div class="login-box">
+    <h1>GeoEscuelas Admin</h1>
+    <div class="sub">Acceso restringido. Inicie sesion con su cuenta de administrador.</div>
+    <label>Email</label>
+    <input id="email" type="email" autocomplete="username" placeholder="usted@iher.hn">
+    <label>Contrasena</label>
+    <input id="password" type="password" autocomplete="current-password">
+    <button id="loginBtn">Entrar</button>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <div class="topbar">
+    <h1>GeoEscuelas Honduras &mdash; Admin</h1>
+    <div class="user" id="userEmail"></div>
+    <button id="reload">Recargar</button>
+    <button id="logout">Salir</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="v" id="sTotal">0</div><div class="l">Total</div></div>
+    <div class="stat ok"><div class="v" id="sLoc">0</div><div class="l">Ubicadas</div></div>
+    <div class="stat pe"><div class="v" id="sPen">0</div><div class="l">Pendientes</div></div>
+    <div class="stat sus"><div class="v" id="sSus">0</div><div class="l">Sospechosas</div></div>
+    <div class="stat"><div class="v" id="sCap">0</div><div class="l">Capturas</div></div>
+    <div class="stat"><div class="v" id="sPct">0%</div><div class="l">Avance</div></div>
+    <div class="bar"><div id="barFill" style="width:0%"></div></div>
+    <div class="exp-buttons">
+      <button id="expGeoJson">GeoJSON</button>
+      <button id="expExcel">Excel</button>
+    </div>
+  </div>
+
+  <div class="body">
+    <aside class="filters">
+      <h3>Departamento</h3>
+      <select id="fDept"><option value="">Todos</option></select>
+
+      <h3>Municipio</h3>
+      <select id="fMuni"><option value="">Todos</option></select>
+
+      <h3>Estado</h3>
+      <div class="chip-row" id="fStatus">
+        <div class="chip active" data-v="all">Todas</div>
+        <div class="chip" data-v="located">Ubicadas</div>
+        <div class="chip" data-v="pending">Pendientes</div>
+        <div class="chip" data-v="suspect">Sospechosas</div>
+      </div>
+
+      <h3>Encuestador</h3>
+      <select id="fSurv"><option value="">Todos</option></select>
+
+      <h3>Metodo</h3>
+      <div class="chip-row" id="fMethod">
+        <div class="chip active" data-v="all">Todos</div>
+        <div class="chip" data-v="gps">GPS</div>
+        <div class="chip" data-v="pin">Pin</div>
+        <div class="chip" data-v="manual">Manual</div>
+      </div>
+
+      <h3>Buscar (nombre/SACE)</h3>
+      <input id="fSearch" placeholder="Ej: 010100021 o La Esperanza">
+
+      <button class="reset" id="fReset">Limpiar filtros</button>
+    </aside>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="legend">
+        <div class="row"><div class="dot ok"></div>Ubicada</div>
+        <div class="row"><div class="dot sus"></div>Sospechosa (lejos del depto)</div>
+        <div class="row"><div class="dot pe"></div>Pendiente (catalogo)</div>
+      </div>
+    </div>
+
+    <aside class="detail empty" id="detail">Seleccione una escuela en el mapa o en la lista de pendientes para ver detalles y acciones.</aside>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
